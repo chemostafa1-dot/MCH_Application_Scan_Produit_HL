@@ -1,0 +1,285 @@
+
+
+<> Html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+
+    <link rel="manifest" href="manifest.json">
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan & Check - Expert Edition</title>
+    <!-- Import de la librairie de scan QR/Code Barre -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Tailwind CSS pour un design rapide et mobile-first -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        #reader { width: 100%; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .card { transition: all 0.3s ease; }
+        .badge-danger { background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+        .badge-success { background-color: #dcfce7; color: #166534; border: 1px solid #4ade80; }
+        .badge-warning { background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+        .scan-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 2px solid #3b82f6; opacity: 0.5; pointer-events: none; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-lg sticky top-0 z-50">
+        <h1 class="text-xl font-bold text-center"><i class="fas fa-barcode mr-2"></i>Scan & Check</h1>
+    </header>
+
+    <!-- Main Container -->
+    <main class="p-4 max-w-md mx-auto">
+        
+        <!-- Zone de Scan -->
+        <div id="scan-section" class="mb-6">
+            <div class="bg-white p-4 rounded-xl shadow-md mb-4">
+                <h2 class="text-gray-700 font-semibold mb-2 text-center">Scanner un code-barre</h2>
+                <div id="reader" class="bg-black min-h-[250px]"></div>
+                <p id="status" class="text-center text-sm text-gray-500 mt-2">En attente de scan...</p>
+            </div>
+        </div>
+
+        <!-- Résultat du Produit (Caché par défaut) -->
+        <div id="result-section" class="hidden">
+            
+            <!-- Carte Identité Produit -->
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden mb-6 card">
+                <div class="relative h-48 bg-gray-200">
+                    <img id="product-img" src="" alt="Produit" class="w-full h-full object-contain p-2">
+                    <div id="nutriscore" class="absolute top-2 right-2 bg-gray-800 text-white px-2 py-1 rounded text-xs font-bold uppercase"></div>
+                </div>
+                <div class="p-5">
+                    <h2 id="product-name" class="text-2xl font-bold text-gray-800 mb-1">Nom du produit</h2>
+                    <p id="product-brand" class="text-gray-500 mb-4">Marque</p>
+
+                    <!-- Analyse des Ingrédients -->
+                    <div class="space-y-3 mb-4">
+                        <div id="check-pork" class="flex items-center justify-between p-3 rounded-lg">
+                            <span class="font-semibold"><i class="fas fa-piggy-bank mr-2"></i>Porc</span>
+                            <span class="status-text font-bold">...</span>
+                        </div>
+                        <div id="check-alcohol" class="flex items-center justify-between p-3 rounded-lg">
+                            <span class="font-semibold"><i class="fas fa-wine-glass mr-2"></i>Alcool</span>
+                            <span class="status-text font-bold">...</span>
+                        </div>
+                        <div id="check-gelatin" class="flex items-center justify-between p-3 rounded-lg">
+                            <span class="font-semibold"><i class="fas fa-candy-cane mr-2"></i>Gélatine</span>
+                            <span class="status-text font-bold">...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparateur de Prix (Simulation) -->
+            <div class="bg-white rounded-xl shadow-lg p-5 mb-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fas fa-map-marker-alt mr-2 text-blue-500"></i>Prix aux alentours</h3>
+                <div id="prices-list" class="space-y-3">
+                    <!-- Les prix seront injectés ici -->
+                </div>
+                <p class="text-xs text-gray-400 mt-2 text-center">* Prix estimés basés sur la localisation</p>
+            </div>
+
+            <button onclick="resetApp()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-700 transition">
+                Scanner un autre produit
+            </button>
+        </div>
+
+    </main>
+
+
+    <script>
+        // --- CONFIGURATION ---
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        let currentLat = null;
+        let currentLon = null;
+
+        // --- 1. INITIALISATION GEOLOCALISATION ---
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    currentLat = position.coords.latitude;
+                    currentLon = position.coords.longitude;
+                    console.log("Position acquise");
+                },
+                () => console.warn("Géolocalisation refusée ou indisponible")
+            );
+        }
+
+        // --- 2. FONCTION DE SCAN ---
+        function startScanner() {
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+            .catch(err => console.error("Erreur caméra", err));
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Arrêter le scan une fois trouvé
+            html5QrcodeScanner.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                document.getElementById('status').innerText = "Produit détecté ! Chargement...";
+                fetchProductData(decodedText);
+            }).catch(err => console.error(err));
+        }
+
+        function onScanFailure(error) {
+            // Juste pour debug, ne pas spammer l'utilisateur
+            // console.warn(`Code scan error = ${error}`);
+        }
+
+        // --- 3. RECUPERATION DONNEES (Open Food Facts) ---
+        async function fetchProductData(barcode) {
+            const apiUrl = `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`;
+
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (data.status === 1) {
+                    displayProduct(data.product);
+                } else {
+                    alert("Produit non trouvé dans la base de données.");
+                    resetApp();
+                }
+            } catch (error) {
+                alert("Erreur de connexion à l'API.");
+                resetApp();
+            }
+        }
+
+        // --- 4. ANALYSE ET AFFICHAGE ---
+        function displayProduct(product) {
+            // Afficher la section résultat
+            document.getElementById('scan-section').classList.add('hidden');
+            document.getElementById('result-section').classList.remove('hidden');
+
+            // Infos de base
+            document.getElementById('product-name').innerText = product.product_name || "Nom inconnu";
+            document.getElementById('product-brand').innerText = product.brands || "Marque inconnue";
+            document.getElementById('product-img').src = product.image_url || "https://via.placeholder.com/300x200?text=Pas+d'image";
+            
+            const score = product.nutriscore_grade ? product.nutriscore_grade.toUpperCase() : "?";
+            document.getElementById('nutriscore').innerText = `Nutri-Score: ${score}`;
+
+            // --- LOGIQUE DETECTIVE INGREDIENTS ---
+            const ingredients = (product.ingredients_text || "").toLowerCase();
+            const labels = (product.labels || "").toLowerCase();
+            const categories = (product.categories || "").toLowerCase();
+
+            // Fonction utilitaire pour le style
+            const setBadge = (elementId, status) => {
+                const el = document.getElementById(elementId);
+                const textEl = el.querySelector('.status-text');
+                
+                el.classList.remove('badge-danger', 'badge-success', 'badge-warning');
+                
+                if (status === 'SAFE') {
+                    el.classList.add('badge-success');
+                    textEl.innerText = "Non détecté";
+                    textEl.innerHTML += ' <i class="fas fa-check-circle"></i>';
+                } else if (status === 'DANGER') {
+                    el.classList.add('badge-danger');
+                    textEl.innerText = "Présent";
+                    textEl.innerHTML += ' <i class="fas fa-exclamation-triangle"></i>';
+                } else {
+                    el.classList.add('badge-warning');
+                    textEl.innerText = "Douteux";
+                }
+            };
+
+            // 1. ALCOOL
+            // OpenFoodFacts a un champ spécifique, mais on vérifie aussi les mots clés
+            let alcoholStatus = 'SAFE';
+            if (ingredients.includes('alcool') || ingredients.includes('alcohol') || ingredients.includes('vin ')) {
+                alcoholStatus = 'DANGER';
+            }
+            setBadge('check-alcohol', alcoholStatus);
+
+            // 2. PORC
+            let porkStatus = 'SAFE';
+            const porkKeywords = ['porc', 'pork', 'jambon', 'lardon', 'bacon', 'saucisson', 'gélatine de porc'];
+            
+            // Si c'est marqué Vegan ou Végétarien ou Halal ou Casher, c'est safe (généralement)
+            const isSafeLabel = labels.includes('vegan') || labels.includes('vegetarian') || labels.includes('halal') || labels.includes('kosher');
+
+            if (!isSafeLabel) {
+                // On cherche les mots clés
+                if (porkKeywords.some(word => ingredients.includes(word))) {
+                    porkStatus = 'DANGER';
+                } else if (ingredients.includes('gélatine') && !ingredients.includes('végétal')) {
+                    // Gélatine non spécifiée -> Douteux
+                    porkStatus = 'WARNING';
+                }
+            }
+            setBadge('check-pork', porkStatus);
+
+            // 3. GELATINE
+            let gelatinStatus = 'SAFE';
+            if (!isSafeLabel) {
+                if (ingredients.includes('gélatine') || ingredients.includes('gelatine') || ingredients.includes('E441')) {
+                    gelatinStatus = 'DANGER';
+                }
+            }
+            setBadge('check-gelatin', gelatinStatus);
+
+            // --- SIMULATION PRIX (Car pas d'API gratuite universelle) ---
+            simulateNearbyPrices();
+        }
+
+        function simulateNearbyPrices() {
+            const container = document.getElementById('prices-list');
+            container.innerHTML = '';
+
+            // Liste fictive de magasins proches
+            const stores = [
+                { name: "Super U", distance: "450m" },
+                { name: "Lidl", distance: "800m" },
+                { name: "Carrefour City", distance: "1.2km" },
+                { name: "Intermarché", distance: "2.5km" }
+            ];
+
+            // Générer un prix de base aléatoire entre 2€ et 8€
+            const basePrice = (Math.random() * (8 - 2) + 2).toFixed(2);
+
+            stores.forEach(store => {
+                // Variation légère du prix par magasin
+                const variance = (Math.random() * 1) - 0.5;
+                const price = (parseFloat(basePrice) + variance).toFixed(2);
+                
+                const html = `
+                    <div class="flex justify-between items-center border-b border-gray-100 pb-2 last:border-0">
+                        <div>
+                            <div class="font-bold text-gray-700">${store.name}</div>
+                            <div class="text-xs text-gray-400"><i class="fas fa-walking"></i> ${store.distance}</div>
+                        </div>
+                        <div class="text-xl font-bold text-green-600">${price} €</div>
+                    </div>
+                `;
+                container.innerHTML += html;
+            });
+        }
+
+        function resetApp() {
+            document.getElementById('result-section').classList.add('hidden');
+            document.getElementById('scan-section').classList.remove('hidden');
+            document.getElementById('reader').style.display = 'block';
+            document.getElementById('status').innerText = "En attente de scan...";
+            
+            // Redémarrer le scanner
+            startScanner();
+        }
+
+        // Démarrage initial
+        startScanner();
+
+    </script>
+</body>
+</html>
+
