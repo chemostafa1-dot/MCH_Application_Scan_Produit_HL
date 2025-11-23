@@ -1,0 +1,20 @@
+## Pour en faire une vraie Application Mobile (Installation)
+## Pour que tes utilisateurs en savoir plus l'installer comme une app native (conicône sur l'écran d'accueil), raftique un manifest.json à la racine de projet :
+
+<> JSON
+
+{
+  "name": "ScanManger",
+  "short_name": "ScanManger",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
